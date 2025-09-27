@@ -42,7 +42,7 @@ class PyTorchJob(pulumi.ComponentResource):
         super().__init__('pytorch-job-component:index:PyTorchJob', name, {}, opts)
 
         namespace = args.get("namespace", "train")
-        gpus_per_node = args.get("gpus_per_node", 8)
+        gpus_per_node = pulumi.Output.from_input(args.get("gpus_per_node") or 8)
         checkpoint_pvc_name = args.get("checkpoint_pvc_name")
         pytorch_mnist_gpu_image_tag = pulumi.Output.from_input(args.get("pytorch_mnist_gpu_image_tag") or "v1beta1-8cd4b8c")
         node_count = pulumi.Output.from_input(args.get("node_count") or 2)
