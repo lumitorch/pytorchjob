@@ -21,7 +21,7 @@ class PyTorchJobArgs(TypedDict):
     pytorch_mnist_gpu_image_tag: Optional[pulumi.Input[str]]
     """The docker image tag to use for pytorch MNIST. Defaults to `v1beta1-8cd4b8c`"""
 
-def worker_nodes(node_count: int) -> int:
+async def worker_nodes(node_count: int) -> int:
     """The number of worker nodes in the cluster."""
 
     worker_count = node_count - 1
