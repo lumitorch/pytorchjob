@@ -118,7 +118,7 @@ FashionMNIST(root=root, train=False, download=True)'''
                                     "command": ["bash", "-lc"],
                                     "args": [
                                         pulumi.Output.format(
-                                            "torchrun --nnodes={0} --nproc_per_node={1} --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT --no_python bash -lc 'export CUDA_VISIBLE_DEVICES=${{LOCAL_RANK}}; exec python /opt/pytorch-mnist/mnist.py --backend=nccl'",
+                                            "torchrun --nnodes={0} --nproc_per_node={1} --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT --no_python bash -lc 'export CUDA_VISIBLE_DEVICES=${{LOCAL_RANK}}; exec python /opt/pytorch-mnist/mnist.py --backend=nccl --epochs=100'",
                                             node_count, gpus_per_node)
                                     ],
                                     "ports": [{
@@ -164,7 +164,7 @@ FashionMNIST(root=root, train=False, download=True)'''
                                     "command": ["bash", "-lc"],
                                     "args": [
                                         pulumi.Output.format(
-                                            "torchrun --nnodes={0} --nproc_per_node={1} --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT --no_python bash -lc 'export CUDA_VISIBLE_DEVICES=${{LOCAL_RANK}}; exec python /opt/pytorch-mnist/mnist.py --backend=nccl'",
+                                            "torchrun --nnodes={0} --nproc_per_node={1} --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT --no_python bash -lc 'export CUDA_VISIBLE_DEVICES=${{LOCAL_RANK}}; exec python /opt/pytorch-mnist/mnist.py --backend=nccl --epochs=100'",
                                             node_count, gpus_per_node)],
                                     "ports": [{
                                         "name": "pytorchjob-port",
