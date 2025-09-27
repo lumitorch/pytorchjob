@@ -21,6 +21,12 @@ class PyTorchJobArgs(TypedDict):
     pytorch_mnist_gpu_image_tag: Optional[pulumi.Input[str]]
     """The docker image tag to use for pytorch MNIST. Defaults to `v1beta1-8cd4b8c`"""
 
+def worker_nodes(node_count: int) -> int:
+    """The number of worker nodes in the cluster."""
+
+    worker_count = node_count - 1
+    assert worker_count >= 1, "Worker count must be at least 1"
+    return worker_count
 
 class PyTorchJob(pulumi.ComponentResource):
     """
@@ -44,13 +50,11 @@ class PyTorchJob(pulumi.ComponentResource):
         namespace = args.get("namespace", "train")
         gpus_per_node = args.get("gpus_per_node", 8)
         checkpoint_pvc_name = args.get("checkpoint_pvc_name")
-        pytorch_mnist_gpu_image_tag = args.get("pytorch_mnist_gpu_image_tag", "v1beta1-8cd4b8c")
-        node_count = args.get("node_count", 2)
+        pytorch_mnist_gpu_image_tag = pulumi.Output.from_input(args.get("pytorch_mnist_gpu_image_tag") or "v1beta1-8cd4b8c")
+        node_count = pulumi.Output.from_input(args.get("node_count") or 2)
 
-        assert node_count >= 2, "Node count must be at least 2"
         master_nodes = 1
-        worker_nodes = node_count - master_nodes
-
+        worker_nodes = node_count.apply(lambda n: worker_nodes(n))
         volume_mount_name = "checkpoint-storage"
         container_port = 23456
 
