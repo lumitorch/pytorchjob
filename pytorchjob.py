@@ -12,7 +12,7 @@ class PyTorchJobArgs(TypedDict):
     gpus_per_node: pulumi.Input[int]
     """The number of GPUs per node. Defaults to `8`"""
 
-    node_count: pulumi.Input[int]
+    node_count: Optional[pulumi.Input[int]]
     """The number of nodes in the cluster. Defaults to `2`"""
 
     checkpoint_pvc_name: pulumi.Input[str]
