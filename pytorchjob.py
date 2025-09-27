@@ -81,7 +81,7 @@ class PyTorchJob(pulumi.ComponentResource):
                                 }],
                                 "initContainers": [{
                                     "name": "warmup-dataset",
-                                    "image": f"docker.io/kubeflowkatib/pytorch-mnist-gpu:{pytorch_mnist_gpu_image_tag}",
+                                    "image": pulumi.Output.format("docker.io/kubeflowkatib/pytorch-mnist-gpu:{0}", pytorch_mnist_gpu_image_tag),
                                     "imagePullPolicy": "IfNotPresent",
                                     "command": ["python", "-c"],
                                     "args": [
@@ -98,7 +98,7 @@ FashionMNIST(root=root, train=False, download=True)'''
                                 }],
                                 "containers": [{
                                     "name": "pytorch",
-                                    "image": f"docker.io/kubeflowkatib/pytorch-mnist-gpu:{pytorch_mnist_gpu_image_tag}",
+                                    "image": pulumi.Output.format("docker.io/kubeflowkatib/pytorch-mnist-gpu:{0}", pytorch_mnist_gpu_image_tag),
                                     "imagePullPolicy": "Always",
                                     "workingDir": "/ckpt",
                                     "env": [
@@ -117,7 +117,8 @@ FashionMNIST(root=root, train=False, download=True)'''
                                     }],
                                     "command": ["bash", "-lc"],
                                     "args": [
-                                        f"torchrun --nnodes={node_count} --nproc_per_node={gpus_per_node} --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT --no_python bash -lc 'export CUDA_VISIBLE_DEVICES=${{LOCAL_RANK}}; exec python /opt/pytorch-mnist/mnist.py --backend=nccl'"],
+                                        pulumi.Output.format("torchrun --nnodes={0} --nproc_per_node={1} --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT --no_python bash -lc 'export CUDA_VISIBLE_DEVICES=${{LOCAL_RANK}}; exec python /opt/pytorch-mnist/mnist.py --backend=nccl'", node_count, gpus_per_node)
+                                    ],
                                     "ports": [{
                                         "name": "pytorchjob-port",
                                         "containerPort": container_port
@@ -140,7 +141,7 @@ FashionMNIST(root=root, train=False, download=True)'''
                                 }],
                                 "containers": [{
                                     "name": "pytorch",
-                                    "image": f"docker.io/kubeflowkatib/pytorch-mnist-gpu:{pytorch_mnist_gpu_image_tag}",
+                                    "image": pulumi.Output.format("docker.io/kubeflowkatib/pytorch-mnist-gpu:{0}", pytorch_mnist_gpu_image_tag),
                                     "imagePullPolicy": "Always",
                                     "workingDir": "/ckpt",
                                     "env": [
@@ -159,7 +160,7 @@ FashionMNIST(root=root, train=False, download=True)'''
                                     }],
                                     "command": ["bash", "-lc"],
                                     "args": [
-                                        f"torchrun --nnodes={node_count} --nproc_per_node={gpus_per_node} --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT --no_python bash -lc 'export CUDA_VISIBLE_DEVICES=${{LOCAL_RANK}}; exec python /opt/pytorch-mnist/mnist.py --backend=nccl'"],
+                                        pulumi.Output.format("torchrun --nnodes={0} --nproc_per_node={1} --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT --no_python bash -lc 'export CUDA_VISIBLE_DEVICES=${{LOCAL_RANK}}; exec python /opt/pytorch-mnist/mnist.py --backend=nccl'", node_count, gpus_per_node)],
                                     "ports": [{
                                         "name": "pytorchjob-port",
                                         "containerPort": container_port
