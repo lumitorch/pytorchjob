@@ -21,12 +21,6 @@ class PyTorchJobArgs(TypedDict):
     pytorch_mnist_gpu_image_tag: Optional[pulumi.Input[str]]
     """The docker image tag to use for pytorch MNIST. Defaults to `v1beta1-8cd4b8c`"""
 
-async def worker_nodes(node_count: int) -> int:
-    """The number of worker nodes in the cluster."""
-
-    worker_count = node_count - 1
-    assert worker_count >= 1, "Worker count must be at least 1"
-    return worker_count
 
 class PyTorchJob(pulumi.ComponentResource):
     """
@@ -54,7 +48,7 @@ class PyTorchJob(pulumi.ComponentResource):
         node_count = pulumi.Output.from_input(args.get("node_count") or 2)
 
         master_nodes = 1
-        worker_nodes = node_count.apply(lambda n: worker_nodes(n))
+        worker_nodes = node_count.apply(lambda n: n - master_nodes)
         volume_mount_name = "checkpoint-storage"
         container_port = 23456
 
@@ -85,7 +79,8 @@ class PyTorchJob(pulumi.ComponentResource):
                                 }],
                                 "initContainers": [{
                                     "name": "warmup-dataset",
-                                    "image": pulumi.Output.format("docker.io/kubeflowkatib/pytorch-mnist-gpu:{0}", pytorch_mnist_gpu_image_tag),
+                                    "image": pulumi.Output.format("docker.io/kubeflowkatib/pytorch-mnist-gpu:{0}",
+                                                                  pytorch_mnist_gpu_image_tag),
                                     "imagePullPolicy": "IfNotPresent",
                                     "command": ["python", "-c"],
                                     "args": [
@@ -102,7 +97,8 @@ FashionMNIST(root=root, train=False, download=True)'''
                                 }],
                                 "containers": [{
                                     "name": "pytorch",
-                                    "image": pulumi.Output.format("docker.io/kubeflowkatib/pytorch-mnist-gpu:{0}", pytorch_mnist_gpu_image_tag),
+                                    "image": pulumi.Output.format("docker.io/kubeflowkatib/pytorch-mnist-gpu:{0}",
+                                                                  pytorch_mnist_gpu_image_tag),
                                     "imagePullPolicy": "Always",
                                     "workingDir": "/ckpt",
                                     "env": [
@@ -121,7 +117,9 @@ FashionMNIST(root=root, train=False, download=True)'''
                                     }],
                                     "command": ["bash", "-lc"],
                                     "args": [
-                                        pulumi.Output.format("torchrun --nnodes={0} --nproc_per_node={1} --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT --no_python bash -lc 'export CUDA_VISIBLE_DEVICES=${{LOCAL_RANK}}; exec python /opt/pytorch-mnist/mnist.py --backend=nccl'", node_count, gpus_per_node)
+                                        pulumi.Output.format(
+                                            "torchrun --nnodes={0} --nproc_per_node={1} --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT --no_python bash -lc 'export CUDA_VISIBLE_DEVICES=${{LOCAL_RANK}}; exec python /opt/pytorch-mnist/mnist.py --backend=nccl'",
+                                            node_count, gpus_per_node)
                                     ],
                                     "ports": [{
                                         "name": "pytorchjob-port",
@@ -145,7 +143,8 @@ FashionMNIST(root=root, train=False, download=True)'''
                                 }],
                                 "containers": [{
                                     "name": "pytorch",
-                                    "image": pulumi.Output.format("docker.io/kubeflowkatib/pytorch-mnist-gpu:{0}", pytorch_mnist_gpu_image_tag),
+                                    "image": pulumi.Output.format("docker.io/kubeflowkatib/pytorch-mnist-gpu:{0}",
+                                                                  pytorch_mnist_gpu_image_tag),
                                     "imagePullPolicy": "Always",
                                     "workingDir": "/ckpt",
                                     "env": [
@@ -164,7 +163,9 @@ FashionMNIST(root=root, train=False, download=True)'''
                                     }],
                                     "command": ["bash", "-lc"],
                                     "args": [
-                                        pulumi.Output.format("torchrun --nnodes={0} --nproc_per_node={1} --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT --no_python bash -lc 'export CUDA_VISIBLE_DEVICES=${{LOCAL_RANK}}; exec python /opt/pytorch-mnist/mnist.py --backend=nccl'", node_count, gpus_per_node)],
+                                        pulumi.Output.format(
+                                            "torchrun --nnodes={0} --nproc_per_node={1} --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT --no_python bash -lc 'export CUDA_VISIBLE_DEVICES=${{LOCAL_RANK}}; exec python /opt/pytorch-mnist/mnist.py --backend=nccl'",
+                                            node_count, gpus_per_node)],
                                     "ports": [{
                                         "name": "pytorchjob-port",
                                         "containerPort": container_port
