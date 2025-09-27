@@ -9,7 +9,7 @@ class PyTorchJobArgs(TypedDict):
     namespace: Optional[pulumi.Input[str]]
     """The namespace to create the PyTorchJob in. Defaults to `train`"""
 
-    gpus_per_node: pulumi.Input[int]
+    gpus_per_node: Optional[pulumi.Input[int]]
     """The number of GPUs per node. Defaults to `8`"""
 
     node_count: Optional[pulumi.Input[int]]
