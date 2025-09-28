@@ -230,6 +230,7 @@ FashionMNIST(root=root, train=False, download=True)'''
         )
 
         self.register_outputs({
+            "pytorchJob": pytorchJob,
             "namespace": namespace,
             "nodeCount": node_count,
             "gpusPerNode": gpus_per_node,
