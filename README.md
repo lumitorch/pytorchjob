@@ -1,20 +1,29 @@
 # PyTorchJob Pulumi Component
 
-A Pulumi component for deploying distributed PyTorch training jobs on Kubernetes using the Kubeflow PyTorchJob Custom Resource.
+A Pulumi component for deploying distributed PyTorch training jobs on Kubernetes using Kubeflow Training Operator's PyTorchJob CRD. Supports multi-node FSDP training with NCCL communication and Kueue queue integration.
 
 ## Overview
 
-This component provides a simple way to deploy distributed PyTorch training jobs on your Kubernetes cluster with GPU support. The component creates a PyTorchJob Custom Resource that runs a Fashion MNIST training job using PyTorch's torchrun utility for distributed training across multiple GPU-enabled nodes.
+The Kubeflow PyTorchJob component enables distributed PyTorch training on Kubernetes clusters. This component provides:
+
+- Distributed training across multiple nodes and GPUs
+- Integration with Kueue for resource scheduling and queue management
+- Support for FSDP (Fully Sharded Data Parallel) training
+- NCCL communication for efficient multi-node coordination
+- Persistent storage for checkpoints and datasets
 
 ## Features
 
-- **Distributed PyTorch Training**: Supports multi-node, multi-GPU distributed training
-- **Fashion MNIST Example**: Pre-configured Fashion MNIST training job
-- **GPU Acceleration**: Full NVIDIA GPU support with configurable GPU allocation
-- **Checkpoint Storage**: Persistent volume support for model checkpoints and dataset storage
-- **Master-Worker Architecture**: Automatically configures master and worker nodes
-- **Dataset Initialization**: Pre-downloads datasets before training begins
-- **Configurable Resources**: Flexible GPU and node count configuration
+- Distributed multi-node, multi-GPU PyTorch training
+- NCCL communication for efficient distributed training
+- FSDP (Fully Sharded Data Parallel) support
+- Kueue integration for queue management and resource scheduling
+- Pre-configured Fashion MNIST training job
+- Full NVIDIA GPU support
+- Persistent volume for checkpoints and datasets
+- Automatic master-worker node configuration
+- Dataset pre-download capability
+- Flexible GPU and node resource configuration
 
 ## Architecture
 
@@ -26,11 +35,19 @@ The component creates the following resources:
 4. **Init Container**: Downloads Fashion MNIST dataset before training starts
 5. **Persistent Volume**: Shared storage for checkpoints and datasets
 
+## Component Integration
+
+Works seamlessly with other LumiTorch components:
+
+- **Kubeflow Training Operator**: Provides PyTorchJob CRD (required)
+- **Kueue**: Queue management for training workloads (optional)
+- **GPU Operator**: GPU resource management and monitoring (recommended)
+
 ## Requirements
 
-- Kubernetes cluster with Kubeflow Training Operator installed
+- Kubernetes cluster with Kubeflow Training Operator
 - GPU-enabled nodes with NVIDIA drivers
-- Persistent volume for checkpoint storage
+- Persistent volume storage
 - Pulumi CLI
 - Python 3.7+
 
@@ -44,7 +61,13 @@ Ensure you have the required dependencies:
 pip install pulumi>=3.0.0,<4.0.0 pulumi-kubernetes>=4.0.0,<5.0.0
 ```
 
-### Usage
+### Install the component
+
+```bash
+pip install pulumi-pytorchjob-component
+```
+
+## Usage
 
 ```python
 from pytorchjob import PyTorchJob
@@ -64,43 +87,55 @@ pytorch_job = PyTorchJob("distributed-training", {
 })
 ```
 
-## Configuration
+## Distributed Training Configuration
 
-### PyTorchJobArgs
+### NCCL Environment Variables
+
+```python
+pytorch_job = PyTorchJob("nccl-training", {
+    "namespace": "train",
+    "node_count": 2,
+    "gpus_per_node": 8,
+    "checkpoint_pvc_name": "distributed-storage",
+    "pytorch_mnist_gpu_image_tag": "v1beta1-8cd4b8c"
+})
+```
+
+### Multi-Node Setup
+
+```python
+pytorch_job = PyTorchJob("multi-node-training", {
+    "namespace": "train",
+    "node_count": 4,  # 1 master + 3 workers
+    "gpus_per_node": 1,
+    "checkpoint_pvc_name": "shared-storage",
+    "pytorch_mnist_gpu_image_tag": "v1beta1-8cd4b8c"
+})
+```
+
+## Queue Management Integration
+
+Integrate with Kueue for resource scheduling:
+
+```python
+pytorch_job = PyTorchJob("queued-training", {
+    "namespace": "train",  # Must match LocalQueue namespace
+    "node_count": 2,
+    "gpus_per_node": 4,
+    "checkpoint_pvc_name": "queue-storage",
+    "pytorch_mnist_gpu_image_tag": "v1beta1-8cd4b8c"
+})
+```
+
+## PyTorchJobArgs
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `checkpoint_pvc_name` | `str` | Yes | - | Name of the PersistentVolumeClaim for checkpoint storage |
-| `namespace` | `str` | No | `train` | Kubernetes namespace to deploy the job |
+| `namespace` | `str` | No | `"train"` | Kubernetes namespace to deploy the job |
 | `gpus_per_node` | `int` | No | `8` | Number of GPUs per node |
 | `node_count` | `int` | No | `2` | Total number of nodes (minimum 2) |
-| `pytorch_mnist_gpu_image_tag` | `str` | No | `v1beta1-8cd4b8c` | Docker image tag for PyTorch MNIST |
-
-### Configuration Notes
-
-- **Minimum Node Count**: The component requires at least 2 nodes (1 master + 1 worker)
-- **GPU Requirements**: Each node should have the specified number of GPUs available
-- **Runtime Class**: Uses `nvidia` runtime class for GPU access
-- **Network Configuration**: Uses NCCL backend for distributed communication
-
-## Training Job Details
-
-### Dataset
-- **Fashion MNIST**: A dataset of clothing item images (28x28 grayscale)
-- **Automatic Download**: Dataset is downloaded during initialization
-- **Shared Storage**: Dataset stored on persistent volume for all nodes
-
-### Distributed Training
-- **torchrun**: Uses PyTorch's native distributed launcher
-- **NCCL Backend**: Optimized for GPU-to-GPU communication
-- **Multi-Node**: Supports scaling across multiple nodes
-- **Multi-GPU**: Supports multiple GPUs per node
-
-### Environment Variables
-- `NCCL_DEBUG`: Set to INFO for debugging communication
-- `TORCH_NCCL_BLOCKING_WAIT`: Ensures synchronous operations
-- `NCCL_SOCKET_IFNAME`: Network interface for NCCL (eth0)
-- `OMP_NUM_THREADS`: OpenMP thread count (set to 1)
+| `pytorch_mnist_gpu_image_tag` | `str` | No | `"v1beta1-8cd4b8c"` | Docker image tag for PyTorch MNIST |
 
 ## Example: Complete Deployment
 
@@ -141,9 +176,27 @@ pytorch_job = PyTorchJob("fashion-mnist-training", {
 }, opts=pulumi.ResourceOptions(depends_on=[checkpoint_pvc]))
 ```
 
-## Monitoring and Management
+## Smoke Testing and Verification
 
-Monitor your PyTorch job using `kubectl`:
+Deploy a smoke test PyTorchJob:
+
+```python
+smoke_test = PyTorchJob("pytorch-smoke-test", {
+    "namespace": "train",
+    "node_count": 2,  # 1 master + 1 worker
+    "gpus_per_node": 1,
+    "checkpoint_pvc_name": "test-storage",
+    "pytorch_mnist_gpu_image_tag": "v1beta1-8cd4b8c"
+})
+
+# Export verification outputs
+pulumi.export("pytorch_job_status", smoke_test.status)
+pulumi.export("checkpoint_location", "/ckpt")
+```
+
+## Monitoring and Verification
+
+Monitor training jobs using `kubectl`:
 
 ```bash
 # Check PyTorchJob status
@@ -162,6 +215,42 @@ kubectl logs -n train -l pytorch-job-role=worker -f
 kubectl get pvc -n train
 ```
 
+### Configuration Notes
+
+- **Minimum Node Count**: The component requires at least 2 nodes (1 master + 1 worker)
+- **GPU Requirements**: Each node should have the specified number of GPUs available
+- **Runtime Class**: Uses `nvidia` runtime class for GPU access
+- **Network Configuration**: Uses NCCL backend for distributed communication
+
+## Training Job Details
+
+### Dataset
+
+- **Fashion MNIST**: A dataset of clothing item images (28x28 grayscale)
+- **Automatic Download**: Dataset is downloaded during initialization
+- **Shared Storage**: Dataset stored on persistent volume for all nodes
+
+### Distributed Training
+
+- **torchrun**: Uses PyTorch's native distributed launcher
+- **NCCL Backend**: Optimized for GPU-to-GPU communication
+- **Multi-Node**: Supports scaling across multiple nodes
+- **Multi-GPU**: Supports multiple GPUs per node
+
+### Environment Variables
+
+- `NCCL_DEBUG`: Set to INFO for debugging communication
+- `TORCH_NCCL_BLOCKING_WAIT`: Ensures synchronous operations
+- `NCCL_SOCKET_IFNAME`: Network interface for NCCL (eth0)
+- `OMP_NUM_THREADS`: OpenMP thread count (set to 1)
+
+## Resource Management
+
+- Set `requests = limits` for GPU resources to ensure proper scheduling
+- Schedule one worker per node to preserve GPU locality
+- Monitor GPU utilization via DCGM metrics (requires GPU Operator)
+- Use node taints and tolerations for GPU scheduling
+
 ## Troubleshooting
 
 ### Common Issues
@@ -172,11 +261,13 @@ kubectl get pvc -n train
 4. **Image pull failures**: Verify Docker image availability and registry access
 
 ### GPU Requirements
+
 - Nodes must have NVIDIA GPUs with proper drivers
 - GPU runtime must be configured (nvidia-docker2 or containerd)
 - Nodes should be labeled appropriately for GPU workloads
 
 ### Network Requirements
+
 - Inter-node communication must be enabled
 - Port 23456 is used for PyTorch distributed communication
 - NCCL requires low-latency networking for optimal performance
@@ -213,8 +304,4 @@ kubectl get pods -n kubeflow
 
 ## Contributing
 
-This component is part of the LumiTorch infrastructure toolkit. For issues and contributions, please refer to the project repository.
-
-## License
-
-Please refer to the project's license file for licensing information.
+Part of the LumiTorch infrastructure toolkit. Contributions welcome via GitHub issues and pull requests.
