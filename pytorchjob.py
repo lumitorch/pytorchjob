@@ -19,7 +19,10 @@ def with_default(value: Optional[pulumi.Input[T]], default: T) -> pulumi.Output[
 # Ensures we always have an Output[int] and fails fast with a helpful message
 # if the user passes an invalid value (e.g., "four").
 
-def _coerce_int(x: Any, *, name: str, min_: int | None = None, max_: int | None = None) -> int:
+
+def _coerce_int(
+    x: Any, *, name: str, min_: int | None = None, max_: int | None = None
+) -> int:
     if isinstance(x, bool):
         raise TypeError(f"{name} must be an integer, not bool")
     if isinstance(x, int):
@@ -44,11 +47,19 @@ def _coerce_int(x: Any, *, name: str, min_: int | None = None, max_: int | None 
     return n
 
 
-def as_int(value: Optional[pulumi.Input[Any]], *, default: int | None, name: str, min_: int | None = None, max_: int | None = None) -> \
-pulumi.Output[int]:
+def as_int(
+    value: Optional[pulumi.Input[Any]],
+    *,
+    default: int | None,
+    name: str,
+    min_: int | None = None,
+    max_: int | None = None,
+) -> pulumi.Output[int]:
     # Normalize to Output, apply default if None, then validate/convert to int
     return pulumi.Output.from_input(value).apply(
-        lambda v: _coerce_int(default if v is None else v, name=name, min_=min_, max_=max_)
+        lambda v: _coerce_int(
+            default if v is None else v, name=name, min_=min_, max_=max_
+        )
     )
 
 
@@ -82,20 +93,25 @@ class PyTorchJob(pulumi.ComponentResource):
     to specify custom resource configurations such as the number of GPUs per node.
     """
 
-    def __init__(self,
-                 name: str,
-                 args: PyTorchJobArgs,
-                 opts: Optional[ResourceOptions] = None) -> None:
-        super().__init__('pytorch-job-component:index:PyTorchJob', name, {}, opts)
+    def __init__(
+        self, name: str, args: PyTorchJobArgs, opts: Optional[ResourceOptions] = None
+    ) -> None:
+        super().__init__("pytorch-job-component:index:PyTorchJob", name, {}, opts)
 
         if args.get("checkpoint_pvc_name") is None:
             raise ValueError("checkpoint_pvc_name is required")
 
         namespace = with_default(args.get("namespace"), "train")
-        gpus_per_node = as_int(args.get("gpus_per_node"), default=8, name="gpus_per_node", min_=1)
+        gpus_per_node = as_int(
+            args.get("gpus_per_node"), default=8, name="gpus_per_node", min_=1
+        )
         checkpoint_pvc_name = pulumi.Output.from_input(args.get("checkpoint_pvc_name"))
-        pytorch_mnist_gpu_image_tag = with_default(args.get("pytorch_mnist_gpu_image_tag"), "v1beta1-8cd4b8c")
-        node_count = as_int(args.get("node_count"), default=2, name="node_count", min_=2)
+        pytorch_mnist_gpu_image_tag = with_default(
+            args.get("pytorch_mnist_gpu_image_tag"), "v1beta1-8cd4b8c"
+        )
+        node_count = as_int(
+            args.get("node_count"), default=2, name="node_count", min_=2
+        )
 
         master_nodes = 1
         worker_nodes = node_count.apply(lambda n: max(n - master_nodes, 0))
@@ -113,15 +129,13 @@ class PyTorchJob(pulumi.ComponentResource):
             {"name": "OMP_NUM_THREADS", "value": "1"},
         ]
 
-        common_volume_mounts = [{
-            "name": volume_mount_name,
-            "mountPath": "/ckpt"
-        }]
+        common_volume_mounts = [{"name": volume_mount_name, "mountPath": "/ckpt"}]
 
         torchrun_cmd = pulumi.Output.format(
             "torchrun --nnodes={0} --nproc_per_node={1} --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT "
             "--no_python bash -lc 'export CUDA_VISIBLE_DEVICES=${{LOCAL_RANK}}; exec python /opt/pytorch-mnist/mnist.py --backend=nccl --epochs=100'",
-            nnodes_str, nproc_str,
+            nnodes_str,
+            nproc_str,
         )
 
         image_ref = pulumi.Output.format(
@@ -132,14 +146,9 @@ class PyTorchJob(pulumi.ComponentResource):
             name,
             api_version="kubeflow.org/v1",
             kind="PyTorchJob",
-            metadata={
-                "name": name,
-                "namespace": namespace
-            },
+            metadata={"name": name, "namespace": namespace},
             spec={
-                "runPolicy": {
-                    "cleanPodPolicy": "None"
-                },
+                "runPolicy": {"cleanPodPolicy": "None"},
                 "pytorchReplicaSpecs": {
                     "Master": {
                         "replicas": master_nodes,
@@ -147,49 +156,67 @@ class PyTorchJob(pulumi.ComponentResource):
                         "template": {
                             "spec": {
                                 "runtimeClassName": "nvidia",
-                                "volumes": [{
-                                    "name": volume_mount_name,
-                                    "persistentVolumeClaim": {
-                                        "claimName": checkpoint_pvc_name
+                                "volumes": [
+                                    {
+                                        "name": volume_mount_name,
+                                        "persistentVolumeClaim": {
+                                            "claimName": checkpoint_pvc_name
+                                        },
                                     }
-                                }],
-                                "initContainers": [{
-                                    "name": "warmup-dataset",
-                                    "image": image_ref,
-                                    "imagePullPolicy": "IfNotPresent",
-                                    "command": ["python", "-c"],
-                                    "args": [
-                                        '''from torchvision.datasets import FashionMNIST
+                                ],
+                                "initContainers": [
+                                    {
+                                        "name": "warmup-dataset",
+                                        "image": image_ref,
+                                        "imagePullPolicy": "IfNotPresent",
+                                        "command": ["python", "-c"],
+                                        "args": [
+                                            """from torchvision.datasets import FashionMNIST
 root="/ckpt/data"
 # Download both splits once; subsequent ranks just read them.
 FashionMNIST(root=root, train=True, download=True)
-FashionMNIST(root=root, train=False, download=True)'''
-                                    ],
-                                    "volumeMounts": [{
-                                        "name": volume_mount_name,
-                                        "mountPath": "/ckpt"
-                                    }]
-                                }],
-                                "containers": [{
-                                    "name": "pytorch",
-                                    "image": image_ref,
-                                    "imagePullPolicy": "Always",
-                                    "workingDir": "/ckpt",
-                                    "env": common_env,
-                                    "resources": {
-                                        "requests": {"nvidia.com/gpu": gpus_per_node},
-                                        "limits": {"nvidia.com/gpu": gpus_per_node}
-                                    },
-                                    "volumeMounts": common_volume_mounts,
-                                    "command": ["bash", "-lc"],
-                                    "args": [torchrun_cmd],
-                                    "ports": [{
-                                        "name": "pytorchjob-port",
-                                        "containerPort": container_port
-                                    }]
-                                }]
+FashionMNIST(root=root, train=False, download=True)"""
+                                        ],
+                                        "volumeMounts": [
+                                            {
+                                                "name": volume_mount_name,
+                                                "mountPath": "/ckpt",
+                                            }
+                                        ],
+                                    }
+                                ],
+                                "containers": [
+                                    {
+                                        "name": "pytorch",
+                                        "image": image_ref,
+                                        "imagePullPolicy": "Always",
+                                        "workingDir": "/ckpt",
+                                        "env": common_env,
+                                        "resources": {
+                                            "requests": {
+                                                "nvidia.com/gpu": gpus_per_node,
+                                                "cpu": "2000m",
+                                                "memory": "8Gi",
+                                            },
+                                            "limits": {
+                                                "nvidia.com/gpu": gpus_per_node,
+                                                "cpu": "4000m",
+                                                "memory": "16Gi",
+                                            },
+                                        },
+                                        "volumeMounts": common_volume_mounts,
+                                        "command": ["bash", "-lc"],
+                                        "args": [torchrun_cmd],
+                                        "ports": [
+                                            {
+                                                "name": "pytorchjob-port",
+                                                "containerPort": container_port,
+                                            }
+                                        ],
+                                    }
+                                ],
                             }
-                        }
+                        },
                     },
                     "Worker": {
                         "replicas": worker_nodes,
@@ -197,43 +224,63 @@ FashionMNIST(root=root, train=False, download=True)'''
                         "template": {
                             "spec": {
                                 "runtimeClassName": "nvidia",
-                                "volumes": [{
-                                    "name": volume_mount_name,
-                                    "persistentVolumeClaim": {
-                                        "claimName": checkpoint_pvc_name
+                                "volumes": [
+                                    {
+                                        "name": volume_mount_name,
+                                        "persistentVolumeClaim": {
+                                            "claimName": checkpoint_pvc_name
+                                        },
                                     }
-                                }],
-                                "containers": [{
-                                    "name": "pytorch",
-                                    "image": image_ref,
-                                    "imagePullPolicy": "Always",
-                                    "workingDir": "/ckpt",
-                                    "env": common_env,
-                                    "resources": {
-                                        "requests": {"nvidia.com/gpu": gpus_per_node},
-                                        "limits": {"nvidia.com/gpu": gpus_per_node}
-                                    },
-                                    "volumeMounts": common_volume_mounts,
-                                    "command": ["bash", "-lc"],
-                                    "args": [torchrun_cmd],
-                                    "ports": [{
-                                        "name": "pytorchjob-port",
-                                        "containerPort": container_port
-                                    }]
-                                }]
+                                ],
+                                "containers": [
+                                    {
+                                        "name": "pytorch",
+                                        "image": image_ref,
+                                        "imagePullPolicy": "Always",
+                                        "workingDir": "/ckpt",
+                                        "env": common_env,
+                                        "resources": {
+                                            "requests": {
+                                                "nvidia.com/gpu": gpus_per_node,
+                                                "cpu": "2000m",
+                                                "memory": "8Gi",
+                                            },
+                                            "limits": {
+                                                "nvidia.com/gpu": gpus_per_node,
+                                                "cpu": "4000m",
+                                                "memory": "16Gi",
+                                            },
+                                        },
+                                        "volumeMounts": common_volume_mounts,
+                                        "command": ["bash", "-lc"],
+                                        "args": [torchrun_cmd],
+                                        "ports": [
+                                            {
+                                                "name": "pytorchjob-port",
+                                                "containerPort": container_port,
+                                            }
+                                        ],
+                                    }
+                                ],
                             }
-                        }
-                    }
-                }
+                        },
+                    },
+                },
             },
-            opts=pulumi.ResourceOptions(parent=self, provider=getattr(opts, "provider", None))
+            opts=pulumi.ResourceOptions(
+                parent=self, provider=getattr(opts, "provider", None)
+            ),
         )
 
-        self.register_outputs({
-            "pytorchJob": pytorchJob,
-            "namespace": namespace,
-            "nodeCount": node_count,
-            "gpusPerNode": gpus_per_node,
-            "totalProcs": pulumi.Output.all(node_count, gpus_per_node).apply(lambda xs: xs[0] * xs[1]),
-            "jobName": name,
-        })
+        self.register_outputs(
+            {
+                "pytorchJob": pytorchJob,
+                "namespace": namespace,
+                "nodeCount": node_count,
+                "gpusPerNode": gpus_per_node,
+                "totalProcs": pulumi.Output.all(node_count, gpus_per_node).apply(
+                    lambda xs: xs[0] * xs[1]
+                ),
+                "jobName": name,
+            }
+        )
