@@ -12,6 +12,17 @@ The Kubeflow PyTorchJob component enables distributed PyTorch training on Kubern
 - NCCL communication for efficient multi-node coordination
 - Persistent storage for checkpoints and datasets
 
+## Why Use This Component
+
+**This component replaces manual PyTorchJob YAML manifests.** Instead of writing 100+ lines of Kubernetes YAML, deploy PyTorchJobs with a single Python call that automatically configures:
+- NCCL environment variables (NCCL_DEBUG, TORCH_NCCL_BLOCKING_WAIT, NCCL_SOCKET_IFNAME)
+- GPU requests = limits
+- Master/worker topology
+- Checkpoint mounting to `/ckpt`
+- Kueue integration
+
+Perfect for smoke tests and production training workloads.
+
 ## Features
 
 - Distributed multi-node, multi-GPU PyTorch training
