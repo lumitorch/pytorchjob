@@ -137,6 +137,45 @@ pytorch_job = PyTorchJob("queued-training", {
 | `node_count` | `int` | No | `2` | Total number of nodes (minimum 2) |
 | `pytorch_mnist_gpu_image_tag` | `str` | No | `"v1beta1-8cd4b8c"` | Docker image tag for PyTorch MNIST |
 
+## Example: Complete Deployment
+
+```python
+import pulumi
+import pulumi_kubernetes as k8s
+from pytorchjob import PyTorchJob
+
+# Create namespace for training
+train_namespace = k8s.core.v1.Namespace(
+    "train-namespace",
+    metadata=k8s.meta.v1.ObjectMetaArgs(name="train")
+)
+
+# Create persistent volume claim for checkpoints
+checkpoint_pvc = k8s.core.v1.PersistentVolumeClaim(
+    "checkpoint-storage",
+    metadata=k8s.meta.v1.ObjectMetaArgs(
+        name="pytorch-checkpoint-pvc",
+        namespace="train"
+    ),
+    spec=k8s.core.v1.PersistentVolumeClaimSpecArgs(
+        access_modes=["ReadWriteMany"],
+        resources=k8s.core.v1.ResourceRequirementsArgs(
+            requests={"storage": "100Gi"}
+        )
+    ),
+    opts=pulumi.ResourceOptions(depends_on=[train_namespace])
+)
+
+# Deploy PyTorch training job
+pytorch_job = PyTorchJob("fashion-mnist-training", {
+    "namespace": "train",
+    "gpus_per_node": 8,
+    "node_count": 2,
+    "checkpoint_pvc_name": "pytorch-checkpoint-pvc",
+    "pytorch_mnist_gpu_image_tag": "v1beta1-8cd4b8c"
+}, opts=pulumi.ResourceOptions(depends_on=[checkpoint_pvc]))
+```
+
 ## Smoke Testing and Verification
 
 Deploy a smoke test PyTorchJob:
